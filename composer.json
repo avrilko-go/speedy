@@ -1,0 +1,19 @@
+{
+  "name": "avrilko/speedy",
+  "description": "a fast php cli event loop framework",
+  "type": "library",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "Speedy\\": "src/"
+    }
+  },
+  "authors": [
+    {
+      "name": "avrilko",
+      "email": "avrilko@qq.com"
+    }
+  ],
+  "minimum-stability": "stable",
+  "require": {}
+}
