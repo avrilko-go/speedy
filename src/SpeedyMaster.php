@@ -11,6 +11,11 @@ namespace Speedy;
 class SpeedyMaster
 {
     /**
+     * 版本号
+     */
+    const VERSION = "V1.0.0";
+
+    /**
      * 系统平台： linux or macos
      */
     const OS_UNIX_LIKE = 1;
@@ -20,6 +25,25 @@ class SpeedyMaster
      */
     const OS_WINDOWS = 2;
 
+    /**
+     * 进程状态：正在启动
+     */
+    const STATUS_STARING = 1;
+
+    /**
+     * 进程状态：正在运行
+     */
+    const STATUS_RUNNING = 2;
+
+    /**
+     * 进程状态：正在重启
+     */
+    const STATUS_RELOADING = 3;
+
+    /**
+     * 进程状态：已停止
+     */
+    const STTAUS_SHUTDOWN = 4;
     /**
      * fid对应的类型
      */
@@ -50,14 +74,46 @@ class SpeedyMaster
     public static bool $outputDecorated = false;
 
     /**
-     * @var string 版本号
+     * @var string 入口运行文件
      */
-    public string $version = "v1.0.0";
+    public static string $startFile;
 
+    /**
+     * @var string pid文件存放位置
+     */
+    public static string $pidFile;
+
+    /**
+     * @var string 日志文件存放位置
+     */
+    public static string $logFile;
+
+    /**
+     * @var int 进程当前状态
+     */
+    public static int $status;
+
+    /**
+     * @var string 进程标题前缀
+     */
+    public static string $processPrefix;
+    /**
+     * @var array 进程全局状态变量
+     */
+    public static array $statistics = [
+        'start_timestamp' => 0,
+        'work_exit_info' => []
+    ];
+
+    /**
+     * @var string 监控文件
+     */
+    public static string $statusMonitorFile;
 
     public static function run()
     {
         static::checkEnv();
+        static::init();
     }
 
     /**
@@ -75,6 +131,11 @@ class SpeedyMaster
 
     public static function init(): void
     {
+        static::checkEnv();
+        static::setErrorHandler();
+        static::initAllFile();
+        static::setProcessTitle(self::$processPrefix . "_master process start file " . self::$startFile);
+        static::initMonitor();
 
     }
 
@@ -101,10 +162,85 @@ class SpeedyMaster
             }
             $msg = str_replace(['<l>', '<w>', '<g>'], [$line, $white, $green], $msg);
             $msg = str_replace(['</l>', '</w>', '</g>', '</e>'], $end, $msg);
+        } elseif (!static::$outputDecorated) {
+            return;
         }
 
         fwrite($stream, $msg);
         fflush($stream);
+    }
+
+    /**
+     * 设置php错误回调
+     */
+    public static function setErrorHandler(): void
+    {
+        set_error_handler(
+            function (int $code, string $errorStr, string $file, string $line) {
+                $out = sprintf(
+                    "erorCode is <g>%d</g>, error desc is <g>%s</g>, file in <g>%s</g>, line <g>%d</g>\r\n",
+                    $code,
+                    $errorStr,
+                    $file,
+                    $line,
+                );
+                static::echoOut($out);
+            }
+        );
+    }
+
+    /**
+     * 初始化文件
+     */
+    public static function initAllFile(): void
+    {
+        $traceInfo = debug_backtrace();
+        static::$startFile = $traceInfo[count($traceInfo) - 1]['file'];
+
+        if (empty(static::$logFile)) {
+            static::$logFile = dirname(static::$startFile) . DIRECTORY_SEPARATOR . "logSpeedy.log";
+        }
+        if (!is_file(static::$logFile)) {
+            touch(static::$logFile);
+            chmod(static::$logFile, 0622);
+        }
+
+        if (empty(static::$pidFile)) {
+            $nameUnique = str_replace("/", "_", self::$startFile);
+            static::$pidFile = dirname(static::$startFile) . DIRECTORY_SEPARATOR . $nameUnique . ".pid";
+        }
+    }
+
+    /**
+     * 初始化进程状态和监控
+     */
+    public static function initMonitor(): void
+    {
+        static::$status = static::STATUS_STARING;
+        static::$statistics['start_timestamp'] = time();
+        static::$statusMonitorFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . "speedy.status";
+    }
+
+    /**
+     * 设置进程标题
+     *
+     * @param string $title
+     */
+    public static function setProcessTitle(string $title): void
+    {
+        set_error_handler(
+            function () {
+            }
+        );
+        if (function_exists('cli_set_process_title')) {
+            cli_set_process_title($title);
+        }
+
+        restore_error_handler();
+    }
+
+    public static function initId(): void
+    {
     }
 
     /**
